@@ -440,7 +440,7 @@ void AdvancedAINavigator3D::_update_vehicle_hints(const Vector3 &p_move_dir, flo
 	float cross_y = forward.cross(target_dir).y; // > 0 means target is to the left in Godot (+Y up)
 	float signed_angle = std::atan2(cross_y, dot_f);
 
-	steer_hint = Math::clamp(signed_angle / (static_cast<float>(Math_PI) * 0.45f), -1.0f, 1.0f);
+	steer_hint = Math::clamp(signed_angle / (static_cast<float>(Math::PI) * 0.45f), -1.0f, 1.0f);
 	// Slow down into sharp turns, or reverse slightly if target is almost behind in vehicle mode.
 	if (steering_mode == STEERING_VEHICLE && dot_f < -0.55f) {
 		throttle_hint = -0.6f;
