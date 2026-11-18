@@ -1,0 +1,22 @@
+# Build outputs
+*.so
+*.dll
+*.dylib
+*.o
+*.a
+*.obj
+
+# SCons
+.sconsign.dblite
+.sconsign
+
+# Python
+__pycache__/
+*.pyc
+
+# Godot generated files
+.godot/
+
+# Temporary files
+*.tmp
+*.log
