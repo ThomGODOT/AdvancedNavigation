@@ -668,3 +668,13 @@ void AdvancedAINavigator3D::set_avoidance_mask(uint32_t p_mask) {
 	avoidance_mask = p_mask;
 	_sync_agent_properties();
 }
+
+void AdvancedAINavigator3D::set_avoidance_enabled(bool p_enable) {
+        if (avoidance_enabled != p_enable) {
+                has_rvo_velocity = false;
+                rvo_safe_velocity = Vector3();
+        }
+
+        avoidance_enabled = p_enable;
+        _sync_agent_properties();
+}
