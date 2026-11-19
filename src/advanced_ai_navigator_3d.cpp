@@ -1,11 +1,13 @@
 #include "advanced_ai_navigator_3d.hpp"
 
+#include <godot_cpp/classes/camera3d.hpp>
 #include <godot_cpp/classes/character_body3d.hpp>
 #include <godot_cpp/classes/collision_object3d.hpp>
 #include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/classes/navigation_server3d.hpp>
 #include <godot_cpp/classes/physics_direct_space_state3d.hpp>
 #include <godot_cpp/classes/physics_ray_query_parameters3d.hpp>
+#include <godot_cpp/classes/viewport.hpp>
 #include <godot_cpp/classes/world3d.hpp>
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/core/math.hpp>
@@ -148,6 +150,40 @@ void AdvancedAINavigator3D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_whisker_avoid_weight"), &AdvancedAINavigator3D::get_whisker_avoid_weight);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "whisker_avoid_weight", PROPERTY_HINT_RANGE, "0.0,5.0,0.1"), "set_whisker_avoid_weight", "get_whisker_avoid_weight");
 
+	ADD_GROUP("Smoothing & Pacing", "");
+	ClassDB::bind_method(D_METHOD("set_steer_smoothing", "value"), &AdvancedAINavigator3D::set_steer_smoothing);
+	ClassDB::bind_method(D_METHOD("get_steer_smoothing"), &AdvancedAINavigator3D::get_steer_smoothing);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "steer_smoothing", PROPERTY_HINT_RANGE, "0.0,30.0,0.5"), "set_steer_smoothing", "get_steer_smoothing");
+	ClassDB::bind_method(D_METHOD("set_arrival_slow_radius", "value"), &AdvancedAINavigator3D::set_arrival_slow_radius);
+	ClassDB::bind_method(D_METHOD("get_arrival_slow_radius"), &AdvancedAINavigator3D::get_arrival_slow_radius);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "arrival_slow_radius", PROPERTY_HINT_RANGE, "0.0,20.0,0.25"), "set_arrival_slow_radius", "get_arrival_slow_radius");
+	ClassDB::bind_method(D_METHOD("set_corner_slowdown", "value"), &AdvancedAINavigator3D::set_corner_slowdown);
+	ClassDB::bind_method(D_METHOD("get_corner_slowdown"), &AdvancedAINavigator3D::get_corner_slowdown);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "corner_slowdown", PROPERTY_HINT_RANGE, "0.0,1.0,0.05"), "set_corner_slowdown", "get_corner_slowdown");
+	ClassDB::bind_method(D_METHOD("get_whisker_debug"), &AdvancedAINavigator3D::get_whisker_debug);
+
+	ADD_GROUP("Performance", "");
+	ClassDB::bind_method(D_METHOD("set_whisker_update_interval", "frames"), &AdvancedAINavigator3D::set_whisker_update_interval);
+	ClassDB::bind_method(D_METHOD("get_whisker_update_interval"), &AdvancedAINavigator3D::get_whisker_update_interval);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "whisker_update_interval", PROPERTY_HINT_RANGE, "1,10,1"), "set_whisker_update_interval", "get_whisker_update_interval");
+	ClassDB::bind_method(D_METHOD("set_whisker_far_distance", "distance"), &AdvancedAINavigator3D::set_whisker_far_distance);
+	ClassDB::bind_method(D_METHOD("get_whisker_far_distance"), &AdvancedAINavigator3D::get_whisker_far_distance);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "whisker_far_distance", PROPERTY_HINT_RANGE, "0.0,500.0,1.0"), "set_whisker_far_distance", "get_whisker_far_distance");
+
+	ADD_GROUP("Look-Ahead (Vehicle Mode)", "");
+	ClassDB::bind_method(D_METHOD("set_look_ahead_distance", "distance"), &AdvancedAINavigator3D::set_look_ahead_distance);
+	ClassDB::bind_method(D_METHOD("get_look_ahead_distance"), &AdvancedAINavigator3D::get_look_ahead_distance);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "look_ahead_distance", PROPERTY_HINT_RANGE, "0.0,30.0,0.25"), "set_look_ahead_distance", "get_look_ahead_distance");
+	ClassDB::bind_method(D_METHOD("set_look_ahead_corner_limit_deg", "degrees"), &AdvancedAINavigator3D::set_look_ahead_corner_limit_deg);
+	ClassDB::bind_method(D_METHOD("get_look_ahead_corner_limit_deg"), &AdvancedAINavigator3D::get_look_ahead_corner_limit_deg);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "look_ahead_corner_limit_deg", PROPERTY_HINT_RANGE, "5.0,90.0,1.0"), "set_look_ahead_corner_limit_deg", "get_look_ahead_corner_limit_deg");
+
+	ADD_GROUP("Unreachable Targets", "");
+	ClassDB::bind_method(D_METHOD("set_unreachable_tolerance", "distance"), &AdvancedAINavigator3D::set_unreachable_tolerance);
+	ClassDB::bind_method(D_METHOD("get_unreachable_tolerance"), &AdvancedAINavigator3D::get_unreachable_tolerance);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "unreachable_tolerance", PROPERTY_HINT_RANGE, "0.0,20.0,0.1"), "set_unreachable_tolerance", "get_unreachable_tolerance");
+	ClassDB::bind_method(D_METHOD("is_target_reachable"), &AdvancedAINavigator3D::is_target_reachable);
+
 	// Signals
 	ADD_SIGNAL(MethodInfo("path_updated", PropertyInfo(Variant::PACKED_VECTOR3_ARRAY, "path")));
 	ADD_SIGNAL(MethodInfo("target_reached"));
@@ -155,6 +191,7 @@ void AdvancedAINavigator3D::_bind_methods() {
 	ADD_SIGNAL(MethodInfo("navigation_link_reached", PropertyInfo(Variant::VECTOR3, "link_position"), PropertyInfo(Variant::INT, "owner_id")));
 	ADD_SIGNAL(MethodInfo("velocity_computed", PropertyInfo(Variant::VECTOR3, "safe_velocity")));
 	ADD_SIGNAL(MethodInfo("agent_stuck", PropertyInfo(Variant::FLOAT, "stuck_duration")));
+	ADD_SIGNAL(MethodInfo("path_failed", PropertyInfo(Variant::VECTOR3, "target"), PropertyInfo(Variant::FLOAT, "gap")));
 }
 
 void AdvancedAINavigator3D::_notification(int p_what) {
@@ -173,6 +210,7 @@ void AdvancedAINavigator3D::_ready() {
 	}
 	_create_server_agent();
 	stuck_anchor_pos = get_global_position();
+	whisker_phase = static_cast<uint32_t>(get_instance_id() % 16);
 }
 
 void AdvancedAINavigator3D::_create_server_agent() {
@@ -279,6 +317,8 @@ void AdvancedAINavigator3D::stop_navigation() {
         desired_velocity = Vector3();
         rvo_safe_velocity = Vector3();
         has_rvo_velocity = false;
+        smoothed_dir = Vector3();
+        whisker_cache_valid = false;
 
         steer_hint = 0.0f;
         throttle_hint = 0.0f;
@@ -329,7 +369,18 @@ bool AdvancedAINavigator3D::force_repath() {
 
 	if (current_path.is_empty()) {
 		current_waypoint_idx = 0;
+		path_target_reachable = false;
+		_notify_path_failed(-1.0f);
 		return false;
+	}
+
+	const float gap = current_path[current_path.size() - 1].distance_to(target_position);
+	if (unreachable_tolerance > 0.0f && gap > unreachable_tolerance) {
+		path_target_reachable = false;
+		_notify_path_failed(gap);
+	} else {
+		path_target_reachable = true;
+		path_failed_notified = false;
 	}
 
 	// Skip initial point if we're already sitting right on it.
@@ -339,21 +390,21 @@ bool AdvancedAINavigator3D::force_repath() {
 	return true;
 }
 
-Vector3 AdvancedAINavigator3D::_compute_whisker_steering(const Vector3 &p_desired_dir, const TypedArray<RID> &p_exclude) {
-	if (!local_whiskers_enabled || p_desired_dir.length_squared() < 0.0001f) {
-		return p_desired_dir;
-	}
+void AdvancedAINavigator3D::_cast_whiskers(const Vector3 &p_flat_dir, const TypedArray<RID> &p_exclude) {
+	whisker_debug.clear();
+	whisker_push = Vector3();
+	whisker_min_ratio = 1.0f;
+	whisker_cache_valid = true;
 
 	Ref<World3D> world = get_world_3d();
 	if (world.is_null()) {
-		return p_desired_dir;
+		return;
 	}
 	PhysicsDirectSpaceState3D *space = world->get_direct_space_state();
 	if (!space) {
-		return p_desired_dir;
+		return;
 	}
 
-	Vector3 flat_dir = Vector3(p_desired_dir.x, 0.0f, p_desired_dir.z).normalized();
 	Vector3 origin = get_global_position() + Vector3(0.0f, whisker_height_offset, 0.0f);
 
 	// 5 whiskers: center, +-half spread, +-full spread
@@ -366,11 +417,8 @@ Vector3 AdvancedAINavigator3D::_compute_whisker_steering(const Vector3 &p_desire
 		-spread_rad,
 	};
 
-	Vector3 avoidance_push = Vector3();
-	float min_hit_ratio = 1.0f;
-
 	for (int i = 0; i < 5; ++i) {
-		Vector3 ray_dir = flat_dir.rotated(Vector3(0.0f, 1.0f, 0.0f), angles[i]);
+		Vector3 ray_dir = p_flat_dir.rotated(Vector3(0.0f, 1.0f, 0.0f), angles[i]);
 		float len = (i == 0) ? whisker_length : whisker_length * 0.8f;
 		Ref<PhysicsRayQueryParameters3D> ray = PhysicsRayQueryParameters3D::create(
 			origin,
@@ -380,32 +428,64 @@ Vector3 AdvancedAINavigator3D::_compute_whisker_steering(const Vector3 &p_desire
 		);
 
 		Dictionary hit = space->intersect_ray(ray);
+
+		Dictionary dbg;
+		dbg["from"] = origin;
+		dbg["to"] = hit.is_empty() ? Vector3(origin + ray_dir * len) : Vector3(hit["position"]);
+		dbg["hit"] = !hit.is_empty();
+		whisker_debug.push_back(dbg);
+
 		if (!hit.is_empty()) {
 			Vector3 hit_pos = hit["position"];
 			float dist = origin.distance_to(hit_pos);
 			float proximity = 1.0f - Math::clamp(dist / len, 0.0f, 1.0f);
-			if (dist / len < min_hit_ratio) {
-				min_hit_ratio = dist / len;
+			if (dist / len < whisker_min_ratio) {
+				whisker_min_ratio = dist / len;
 			}
 
 			// Steer away from blocked ray; break symmetry if center whisker hits dead-on.
 			Vector3 push_dir;
 			if (i == 0) {
-				push_dir = Vector3(0.0f, 1.0f, 0.0f).cross(flat_dir) * static_cast<float>(recovery_dir_sign);
+				push_dir = Vector3(0.0f, 1.0f, 0.0f).cross(p_flat_dir) * static_cast<float>(recovery_dir_sign);
 			} else {
 				push_dir = -ray_dir;
 			}
-			avoidance_push += push_dir * (proximity * whisker_avoid_weight);
+			whisker_push += push_dir * (proximity * whisker_avoid_weight);
+		}
+	}
+}
+
+Vector3 AdvancedAINavigator3D::_compute_whisker_steering(const Vector3 &p_desired_dir, const TypedArray<RID> &p_exclude) {
+	if (!local_whiskers_enabled || p_desired_dir.length_squared() < 0.0001f) {
+		whisker_cache_valid = false;
+		whisker_debug.clear();
+		return p_desired_dir;
+	}
+
+	Vector3 flat_dir = Vector3(p_desired_dir.x, 0.0f, p_desired_dir.z).normalized();
+
+	// Re-cast every N frames (staggered per agent; rarer when the agent is far from the camera).
+	int32_t interval = (whisker_update_interval < 1) ? 1 : whisker_update_interval;
+	if (whisker_far_distance > 0.0f) {
+		Viewport *viewport = get_viewport();
+		Camera3D *camera = viewport ? viewport->get_camera_3d() : nullptr;
+		if (camera && camera->get_global_position().distance_squared_to(get_global_position()) > whisker_far_distance * whisker_far_distance) {
+			interval *= 4;
 		}
 	}
 
-	Vector3 combined = flat_dir + avoidance_push;
+	whisker_frame_counter++;
+	if (!whisker_cache_valid || (whisker_frame_counter + whisker_phase) % static_cast<uint32_t>(interval) == 0) {
+		_cast_whiskers(flat_dir, p_exclude);
+	}
+
+	Vector3 combined = flat_dir + whisker_push;
 	combined.y = 0.0f;
 	if (combined.length_squared() < 0.001f) {
 		// Dead-end: gently push laterally.
 		combined = Vector3(0.0f, 1.0f, 0.0f).cross(flat_dir) * static_cast<float>(recovery_dir_sign);
 	}
-	return combined.normalized() * Math::lerp(0.4f, 1.0f, min_hit_ratio);
+	return combined.normalized() * Math::lerp(0.4f, 1.0f, whisker_min_ratio);
 }
 
 void AdvancedAINavigator3D::_update_vehicle_hints(const Vector3 &p_move_dir, float p_speed_ratio) {
@@ -557,6 +637,15 @@ void AdvancedAINavigator3D::_physics_process(double p_delta) {
 	to_wp.y = 0.0f;
 	Vector3 raw_dir = (to_wp.length_squared() > 0.0001f) ? to_wp.normalized() : Vector3();
 
+	// Vehicle mode: aim at a point further along the path instead of the next waypoint.
+	if (steering_mode == STEERING_VEHICLE && look_ahead_distance > 0.01f && recovery_reverse_timer <= 0.0) {
+		Vector3 to_aim = _get_look_ahead_point(current_pos) - current_pos;
+		to_aim.y = 0.0f;
+		if (to_aim.length_squared() > 0.0001f) {
+			raw_dir = to_aim.normalized();
+		}
+	}
+
 	// Exclude parent CollisionObject3D (e.g. CharacterBody3D or car RigidBody3D) from whisker rays.
 	TypedArray<RID> exclude;
 	if (CollisionObject3D *col = Object::cast_to<CollisionObject3D>(get_parent())) {
@@ -567,9 +656,45 @@ void AdvancedAINavigator3D::_physics_process(double p_delta) {
 	float speed_scale = Math::clamp(steered_vec.length(), 0.0f, 1.0f);
 	Vector3 steered_dir = (steered_vec.length_squared() > 0.0001f) ? steered_vec.normalized() : raw_dir;
 
+	// Heading smoothing (skipped while reversing out of a stuck spot).
+	if (steer_smoothing > 0.0f && recovery_reverse_timer <= 0.0) {
+		if (smoothed_dir.length_squared() < 0.0001f) {
+			smoothed_dir = steered_dir;
+		} else {
+			const float t = Math::clamp(steer_smoothing * static_cast<float>(p_delta), 0.0f, 1.0f);
+			smoothed_dir = smoothed_dir.lerp(steered_dir, t);
+			smoothed_dir = (smoothed_dir.length_squared() > 0.0001f) ? smoothed_dir.normalized() : steered_dir;
+		}
+		steered_dir = smoothed_dir;
+	} else {
+		smoothed_dir = steered_dir;
+	}
+
 	if (recovery_reverse_timer > 0.0 && steering_mode == STEERING_OMNI) {
 		steered_dir = (Vector3(0.0f, 1.0f, 0.0f).cross(steered_dir) * static_cast<float>(recovery_dir_sign) - raw_dir * 0.5f).normalized();
 
+	}
+
+	// Corner pacing: slow down when a sharp turn is coming up.
+	if (corner_slowdown > 0.0f && current_waypoint_idx + 1 < current_path.size()) {
+		Vector3 seg_a = next_wp - current_pos;
+		Vector3 seg_b = current_path[current_waypoint_idx + 1] - next_wp;
+		seg_a.y = 0.0f;
+		seg_b.y = 0.0f;
+		if (seg_a.length_squared() > 0.0001f && seg_b.length_squared() > 0.0001f) {
+			const float cos_a = seg_a.normalized().dot(seg_b.normalized());
+			const float sharpness = (1.0f - cos_a) * 0.5f;
+			const float proximity = Math::clamp(1.0f - seg_a.length() / (waypoint_reached_distance * 4.0f), 0.0f, 1.0f);
+			speed_scale *= 1.0f - corner_slowdown * sharpness * proximity;
+		}
+	}
+
+	// Arrival easing: never below 25% so the agent still reaches its target.
+	if (arrival_slow_radius > 0.01f) {
+		const float remaining = get_remaining_distance();
+		if (remaining < arrival_slow_radius) {
+			speed_scale *= Math::clamp(remaining / arrival_slow_radius, 0.25f, 1.0f);
+		}
 	}
 
 	desired_velocity = steered_dir * (max_speed * speed_scale);
@@ -609,6 +734,44 @@ void AdvancedAINavigator3D::_physics_process(double p_delta) {
 			}
 		}
 	}
+}
+
+Vector3 AdvancedAINavigator3D::_get_look_ahead_point(const Vector3 &p_pos) const {
+	// Walk along the path by look_ahead_distance, but stop at corners sharper than the limit.
+	const float cos_limit = std::cos(Math::deg_to_rad(look_ahead_corner_limit_deg));
+	Vector3 from = p_pos;
+	float remaining = look_ahead_distance;
+
+	for (int32_t i = current_waypoint_idx; i < current_path.size(); ++i) {
+		const Vector3 to = current_path[i];
+		Vector3 seg = to - from;
+		seg.y = 0.0f;
+		const float seg_len = seg.length();
+
+		if (seg_len >= remaining && seg_len > 0.0001f) {
+			return from + seg * (remaining / seg_len);
+		}
+		remaining -= seg_len;
+
+		if (i + 1 < current_path.size() && seg_len > 0.0001f) {
+			Vector3 next_seg = current_path[i + 1] - to;
+			next_seg.y = 0.0f;
+			if (next_seg.length_squared() > 0.0001f && seg.normalized().dot(next_seg.normalized()) < cos_limit) {
+				return to;
+			}
+		}
+		from = to;
+	}
+	return current_path[current_path.size() - 1];
+}
+
+void AdvancedAINavigator3D::_notify_path_failed(float p_gap) {
+	if (path_failed_notified && last_failed_target.is_equal_approx(target_position)) {
+		return;
+	}
+	path_failed_notified = true;
+	last_failed_target = target_position;
+	emit_signal("path_failed", target_position, p_gap);
 }
 
 Vector3 AdvancedAINavigator3D::get_next_waypoint() const {

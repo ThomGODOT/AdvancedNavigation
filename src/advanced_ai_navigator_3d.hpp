@@ -9,6 +9,7 @@
 #include <godot_cpp/variant/rid.hpp>
 #include <godot_cpp/variant/vector3.hpp>
 #include <godot_cpp/variant/typed_array.hpp>
+#include <godot_cpp/variant/array.hpp>
 
 namespace godot {
 
@@ -95,6 +96,32 @@ private:
 	double recovery_reverse_timer = 0.0;
 	int32_t recovery_dir_sign = 1;
 
+	// Smoothing & pacing
+	float steer_smoothing = 8.0f;
+	float arrival_slow_radius = 3.0f;
+	float corner_slowdown = 0.6f;
+	Vector3 smoothed_dir = Vector3(0.0f, 0.0f, 0.0f);
+	Array whisker_debug;
+
+	// Raycast budget
+	int32_t whisker_update_interval = 2;
+	float whisker_far_distance = 45.0f;
+	Vector3 whisker_push = Vector3(0.0f, 0.0f, 0.0f);
+	float whisker_min_ratio = 1.0f;
+	bool whisker_cache_valid = false;
+	uint32_t whisker_frame_counter = 0;
+	uint32_t whisker_phase = 0;
+
+	// Look-ahead (vehicle mode)
+	float look_ahead_distance = 3.0f;
+	float look_ahead_corner_limit_deg = 40.0f;
+
+	// Unreachable targets
+	float unreachable_tolerance = 1.5f;
+	bool path_target_reachable = true;
+	bool path_failed_notified = false;
+	Vector3 last_failed_target = Vector3(0.0f, 0.0f, 0.0f);
+
 	void _create_server_agent();
 	void _free_server_agent();
 	void _sync_agent_properties();
@@ -104,6 +131,9 @@ private:
 	Vector3 _compute_whisker_steering(const Vector3 &p_desired_dir, const TypedArray<RID> &p_exclude);
 	void _update_vehicle_hints(const Vector3 &p_move_dir, float p_speed_ratio);
 	void _update_stuck_detector(double p_delta, const Vector3 &p_pos);
+	void _cast_whiskers(const Vector3 &p_flat_dir, const TypedArray<RID> &p_exclude);
+	Vector3 _get_look_ahead_point(const Vector3 &p_pos) const;
+	void _notify_path_failed(float p_gap);
 
 protected:
 	static void _bind_methods();
@@ -209,6 +239,25 @@ public:
 
 	void set_whisker_avoid_weight(float p_weight) { whisker_avoid_weight = p_weight; }
 	float get_whisker_avoid_weight() const { return whisker_avoid_weight; }
+
+	void set_steer_smoothing(float p_value) { steer_smoothing = p_value; }
+	float get_steer_smoothing() const { return steer_smoothing; }
+	void set_arrival_slow_radius(float p_value) { arrival_slow_radius = p_value; }
+	float get_arrival_slow_radius() const { return arrival_slow_radius; }
+	void set_corner_slowdown(float p_value) { corner_slowdown = p_value; }
+	float get_corner_slowdown() const { return corner_slowdown; }
+	Array get_whisker_debug() const { return whisker_debug; }
+	void set_whisker_update_interval(int32_t p_frames) { whisker_update_interval = p_frames; }
+	int32_t get_whisker_update_interval() const { return whisker_update_interval; }
+	void set_whisker_far_distance(float p_dist) { whisker_far_distance = p_dist; }
+	float get_whisker_far_distance() const { return whisker_far_distance; }
+	void set_look_ahead_distance(float p_dist) { look_ahead_distance = p_dist; }
+	float get_look_ahead_distance() const { return look_ahead_distance; }
+	void set_look_ahead_corner_limit_deg(float p_deg) { look_ahead_corner_limit_deg = p_deg; }
+	float get_look_ahead_corner_limit_deg() const { return look_ahead_corner_limit_deg; }
+	void set_unreachable_tolerance(float p_dist) { unreachable_tolerance = p_dist; }
+	float get_unreachable_tolerance() const { return unreachable_tolerance; }
+	bool is_target_reachable() const { return path_target_reachable; }
 };
 
 } // namespace godot

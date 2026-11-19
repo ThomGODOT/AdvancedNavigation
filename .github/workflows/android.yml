@@ -37,6 +37,9 @@ jobs:
       - name: Build extension
         run: scons platform=android arch=arm64 target=template_debug
 
+      - name: Build extension (release)
+        run: scons platform=android arch=arm64 target=template_release
+
       - name: Upload Android library
         uses: actions/upload-artifact@v7
         with:
